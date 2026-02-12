@@ -1,0 +1,122 @@
+{
+  "site": {
+    "name": "Garage Sale",
+    "description": "Las mejores ofertas en artículos de segunda mano"
+  },
+  "nav": {
+    "home": "Inicio",
+    "categories": "Categorías",
+    "products": "Productos",
+    "cart": "Carrito",
+    "admin": "Admin",
+    "search": "Buscar productos...",
+    "darkMode": "Modo oscuro",
+    "lightMode": "Modo claro"
+  },
+  "home": {
+    "heroTitle": "Venta de Garage",
+    "heroSubtitle": "Encuentra artículos increíbles a precios irresistibles",
+    "heroCta": "Ver productos",
+    "offers": "Ofertas destacadas",
+    "offersSubtitle": "Los mejores descuentos disponibles ahora",
+    "featuredCategories": "Categorías destacadas",
+    "featuredCategoriesSubtitle": "Explora por categoría",
+    "viewAll": "Ver todas"
+  },
+  "categories": {
+    "title": "Categorías",
+    "subtitle": "Explora todos nuestros artículos organizados por categoría",
+    "products": "productos",
+    "offers": "ofertas"
+  },
+  "products": {
+    "title": "Productos",
+    "subtitle": "Encuentra lo que buscas",
+    "all": "Todos",
+    "onSale": "En oferta",
+    "addToCart": "Agregar al carrito",
+    "added": "Agregado",
+    "sold": "Vendido",
+    "off": "OFF",
+    "noProducts": "No se encontraron productos",
+    "description": "Descripción",
+    "tags": "Etiquetas",
+    "category": "Categoría",
+    "prev": "Anterior",
+    "next": "Siguiente",
+    "close": "Cerrar",
+    "filterByCategory": "Filtrar por categoría"
+  },
+  "cart": {
+    "title": "Carrito de Compras",
+    "subtitle": "Revisa tus artículos antes de continuar",
+    "product": "Producto",
+    "price": "Precio",
+    "quantity": "Cantidad",
+    "subtotal": "Subtotal",
+    "actions": "Acciones",
+    "total": "Total",
+    "sendWhatsApp": "Enviar por WhatsApp",
+    "clearCart": "Vaciar carrito",
+    "empty": "Tu carrito está vacío",
+    "emptyMessage": "Agrega productos para comenzar",
+    "goToProducts": "Ir a productos",
+    "remove": "Eliminar",
+    "confirmClear": "¿Estás seguro de vaciar el carrito?",
+    "whatsappMessage": "Hola! Me interesan estos artículos de la Venta de Garage:"
+  },
+  "admin": {
+    "title": "Panel de Administración",
+    "login": "Iniciar sesión",
+    "password": "Contraseña",
+    "enter": "Entrar",
+    "wrongPassword": "Contraseña incorrecta",
+    "logout": "Cerrar sesión",
+    "dashboard": "Dashboard",
+    "registerSale": "Registrar venta",
+    "salesToday": "Ventas hoy",
+    "salesWeek": "Ventas esta semana",
+    "salesMonth": "Ventas este mes",
+    "totalSales": "Ventas totales",
+    "salesByCategory": "Ventas por categoría",
+    "salesByOrigin": "Ventas por origen",
+    "salesByPayment": "Ventas por método de pago",
+    "recentSales": "Últimas ventas",
+    "exportCsv": "Exportar CSV",
+    "date": "Fecha",
+    "productIds": "IDs Productos",
+    "titles": "Títulos",
+    "totalAmount": "Total",
+    "origin": "Origen",
+    "paymentMethod": "Método de pago",
+    "notes": "Notas",
+    "buyer": "Comprador",
+    "selectProducts": "Seleccionar productos",
+    "searchProducts": "Buscar productos...",
+    "originOptions": {
+      "facebook": "Facebook",
+      "whatsapp": "WhatsApp",
+      "moms": "Grupo de mamás",
+      "instagram": "Instagram",
+      "referral": "Referido",
+      "other": "Otro"
+    },
+    "paymentOptions": {
+      "cash": "Efectivo",
+      "transfer": "Transferencia"
+    },
+    "confirm": "Confirmar venta",
+    "saleRegistered": "Venta registrada exitosamente",
+    "saleError": "Error al registrar la venta",
+    "noSales": "No hay ventas registradas"
+  },
+  "search": {
+    "noResults": "No se encontraron resultados",
+    "results": "resultados"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error al cargar los datos",
+    "retry": "Reintentar"
+  }
+}

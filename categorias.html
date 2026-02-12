@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es" class="">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Categorías — Garage Sale</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            teal: { 600: '#0d9488', 500: '#14b8a6', 700: '#0f766e' },
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.js"></script>
+</head>
+<body class="bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-200 min-h-screen">
+  <nav id="navbar"></nav>
+
+  <main id="categories-page" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-200" data-i18n="categories.title">Categorías</h1>
+      <p class="text-gray-500 dark:text-gray-400 mt-2" data-i18n="categories.subtitle">
+        Explora todos nuestros artículos organizados por categoría
+      </p>
+    </div>
+
+    <!-- Categories Grid -->
+    <div id="categories-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <!-- Populated by categories.js -->
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-2 text-teal-600 dark:text-teal-400 font-bold">
+          <i data-lucide="store" class="w-5 h-5"></i>
+          <span>Garage Sale</span>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400">&copy; 2025 Garage Sale.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/sheets-api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/categories.js"></script>
+</body>
+</html>

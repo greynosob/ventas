@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es" class="">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Garage Sale — Venta de Garage</title>
+  <meta name="description" content="Las mejores ofertas en artículos de segunda mano">
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            teal: { 600: '#0d9488', 500: '#14b8a6', 700: '#0f766e' },
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.js"></script>
+</head>
+<body class="bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-200 min-h-screen">
+  <!-- Navbar -->
+  <nav id="navbar"></nav>
+
+  <main id="home-page">
+    <!-- Hero Section -->
+    <section class="relative h-[60vh] min-h-[400px] flex items-center justify-center overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-br from-teal-700 via-teal-600 to-orange-500"></div>
+      <div class="hero-overlay absolute inset-0"></div>
+      <div class="relative z-10 text-center px-4 animate-fade-in">
+        <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
+          <i data-lucide="tag" class="w-4 h-4 text-white"></i>
+          <span class="text-white text-sm font-medium">Ofertas especiales disponibles</span>
+        </div>
+        <h1 class="text-4xl md:text-6xl font-bold text-white mb-4" data-i18n="home.heroTitle">Venta de Garage</h1>
+        <p class="text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto" data-i18n="home.heroSubtitle">
+          Encuentra artículos increíbles a precios irresistibles
+        </p>
+        <a href="productos.html"
+          class="inline-flex items-center gap-2 bg-white text-teal-700 font-semibold px-8 py-3 rounded-full hover:bg-gray-100 transition-colors shadow-lg">
+          <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+          <span data-i18n="home.heroCta">Ver productos</span>
+        </a>
+      </div>
+      <!-- Decorative shapes -->
+      <div class="absolute -bottom-1 left-0 right-0">
+        <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H0Z"
+            class="fill-gray-50 dark:fill-slate-900"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- Ofertas destacadas -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200" data-i18n="home.offers">Ofertas destacadas</h2>
+          <p class="text-gray-500 dark:text-gray-400 text-sm mt-1" data-i18n="home.offersSubtitle">Los mejores descuentos disponibles ahora</p>
+        </div>
+        <div class="flex gap-2">
+          <button id="carousel-prev" class="p-2 rounded-full bg-white dark:bg-slate-800 shadow border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+            <i data-lucide="chevron-left" class="w-5 h-5 text-gray-600 dark:text-gray-300"></i>
+          </button>
+          <button id="carousel-next" class="p-2 rounded-full bg-white dark:bg-slate-800 shadow border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+            <i data-lucide="chevron-right" class="w-5 h-5 text-gray-600 dark:text-gray-300"></i>
+          </button>
+        </div>
+      </div>
+      <div id="offers-carousel" class="carousel-container flex gap-4 overflow-x-auto pb-4">
+        <!-- Populated by home.js -->
+      </div>
+    </section>
+
+    <!-- Categorías destacadas -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200" data-i18n="home.featuredCategories">Categorías destacadas</h2>
+          <p class="text-gray-500 dark:text-gray-400 text-sm mt-1" data-i18n="home.featuredCategoriesSubtitle">Explora por categoría</p>
+        </div>
+        <a href="categorias.html" class="text-teal-600 dark:text-teal-400 text-sm font-medium hover:underline flex items-center gap-1">
+          <span data-i18n="home.viewAll">Ver todas</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </a>
+      </div>
+      <div id="featured-categories" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <!-- Populated by home.js -->
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-2 text-teal-600 dark:text-teal-400 font-bold">
+          <i data-lucide="store" class="w-5 h-5"></i>
+          <span>Garage Sale</span>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          &copy; 2025 Garage Sale. Todos los derechos reservados.
+        </p>
+        <div class="flex items-center gap-4">
+          <a href="admin.html" class="text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 text-sm">Admin</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="config.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/sheets-api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/home.js"></script>
+</body>
+</html>

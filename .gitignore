@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Environment variables
+.env
+.env.*
+
+# Build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude Code
+.claude/

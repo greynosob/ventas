@@ -1,0 +1,17 @@
+{
+  "name": "garage-sale",
+  "version": "1.0.0",
+  "description": "Sitio de venta de garage con Google Sheets como backend",
+  "private": true,
+  "scripts": {
+    "start": "npx serve . -p 3000",
+    "dev": "npx serve . -p 3000 --cors"
+  },
+  "keywords": [
+    "garage-sale",
+    "e-commerce",
+    "google-sheets",
+    "vanilla-js"
+  ],
+  "license": "MIT"
+}
