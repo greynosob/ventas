@@ -4,13 +4,17 @@
 
 const SheetsWriter = (() => {
   /**
-   * Envía un POST al Apps Script
+   * Envía un POST al Apps Script incluyendo token de API y token de sesión admin
    */
   async function _post(data) {
     const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' }, // Apps Script requiere text/plain para evitar preflight CORS
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        ...data,
+        token: CONFIG.API_TOKEN,
+        sessionToken: sessionStorage.getItem('admin-session-token')
+      })
     });
 
     if (!res.ok) {

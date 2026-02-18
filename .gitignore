@@ -22,3 +22,6 @@ npm-debug.log*
 
 # Claude Code
 .claude/
+
+# Generated at build time — never commit
+config.js

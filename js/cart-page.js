@@ -217,7 +217,8 @@ const CartPage = (() => {
   return { init, render, changeQty, setQty, removeItem, confirmClear, sendWhatsApp };
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
+// Espera a que App.init() termine (i18n cargado) antes de renderizar
+window.addEventListener('app-ready', () => {
   if (document.getElementById('cart-page')) {
     CartPage.init();
   }

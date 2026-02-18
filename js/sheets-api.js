@@ -7,7 +7,7 @@ const SheetsAPI = (() => {
   const cache = {};
 
   /**
-   * Fetch genérico a Google Sheets API con caché
+   * Fetch genérico a Google Sheets API con caché (datos públicos: Inventario, Categorías)
    */
   async function _fetch(range) {
     const cacheKey = range;
@@ -44,11 +44,51 @@ const SheetsAPI = (() => {
   }
 
   /**
+   * Fetch a través de Apps Script con token (datos sensibles: Ventas)
+   */
+  async function _fetchViaScript(range) {
+    const cacheKey = 'script:' + range;
+    const cached = cache[cacheKey];
+
+    if (cached && (Date.now() - cached.timestamp) < CONFIG.CACHE_TTL) {
+      return cached.data;
+    }
+
+    const url = `${CONFIG.APPS_SCRIPT_URL}?token=${encodeURIComponent(CONFIG.API_TOKEN)}&range=${encodeURIComponent(range)}`;
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      throw new Error(`Apps Script error: ${res.status} ${res.statusText}`);
+    }
+
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Error de Apps Script');
+
+    const rows = json.values || [];
+    if (rows.length < 2) return [];
+
+    // Primera fila = headers, resto = datos (formato array de arrays)
+    const headers = rows[0];
+    const data = rows.slice(1).map(row => {
+      const obj = {};
+      headers.forEach((header, i) => {
+        const val = row[i];
+        obj[header] = (val !== undefined && val !== null) ? String(val) : '';
+      });
+      return obj;
+    });
+
+    cache[cacheKey] = { data, timestamp: Date.now() };
+    return data;
+  }
+
+  /**
    * Invalida la caché de un rango específico o toda
    */
   function invalidateCache(range) {
     if (range) {
       delete cache[range];
+      delete cache['script:' + range];
     } else {
       Object.keys(cache).forEach(k => delete cache[k]);
     }
@@ -104,10 +144,10 @@ const SheetsAPI = (() => {
   }
 
   /**
-   * Obtiene todas las ventas
+   * Obtiene todas las ventas (vía Apps Script — datos sensibles)
    */
   async function getSales() {
-    const data = await _fetch(CONFIG.RANGES.VENTAS);
+    const data = await _fetchViaScript(CONFIG.RANGES.VENTAS);
     return data.map(row => ({
       id: row['ID'] || '',
       date: row['Fecha'] || '',

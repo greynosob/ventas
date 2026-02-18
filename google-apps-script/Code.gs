@@ -1,67 +1,73 @@
 // ============================================================
-// Code.gs — Google Apps Script Web App (Proxy de lectura y escritura)
+// Code.gs — Google Apps Script Web App
 // ============================================================
 //
-// INSTRUCCIONES DE SETUP:
-// 1. Abrir Google Apps Script: https://script.google.com
-// 2. Crear un nuevo proyecto
-// 3. Pegar este código en Code.gs
-// 4. Reemplazar SPREADSHEET_ID con el ID de tu Google Sheet
-// 5. Deploy → New deployment → Web app
-//    - Execute as: Me
-//    - Who has access: Anyone
-// 6. Copiar la URL del deployment y pegarla en config.js como APPS_SCRIPT_URL
+// SETUP:
+// 1. Project Settings > Script Properties — configurar:
+//    API_TOKEN            — Token compartido con el frontend (64 hex chars)
+//    SHEET_ID             — ID del Google Sheet
+//    ADMIN_PASSWORD_HASH  — Hash PBKDF2 de la contraseña admin (nunca va a git)
+//    ADMIN_PASSWORD_SALT  — Salt PBKDF2 en hex (igual que ADMIN_PASSWORD_SALT de GitHub Secrets)
 //
-// ESTRUCTURA DE LA HOJA "Ventas":
-// Columnas: ID | Fecha | ProductoIDs | Títulos | Total | Origen | MétodoPago | Notas | Comprador
+// 2. Deploy > New deployment > Web app
+//    Execute as: Me | Who has access: Anyone
 //
-// ESTRUCTURA DE LA HOJA "Inventario":
-// Columnas: ID | Título | DescripciónCorta | DescripciónLarga | Precio | PrecioAnterior | Categoría | Tags | Imágenes | Estado | FechaPublicación
+// 3. Triggers > Add Trigger:
+//    Function: cleanupExpiredSessions | Time-driven > Every 6 hours
 //
 
-const SPREADSHEET_ID = '1RX_C0ZNMiKRdgG_JB0jCtlm-9PXuv8b5pGKnl2cwExA'; // ← Reemplazar con tu Sheet ID
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 horas
+
+// ========================
+// Autenticación — Token
+// ========================
 
 /**
- * Maneja peticiones POST
+ * Validación de token compartido en tiempo constante (anti-timing attack)
  */
-function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    let result;
-
-    switch (data.action) {
-      case 'registerSale':
-        result = registerSale(data);
-        break;
-      case 'markSold':
-        result = markSold(data.productIds);
-        break;
-      default:
-        return jsonResponse({ success: false, error: 'Acción no reconocida: ' + data.action }, 400);
-    }
-
-    return jsonResponse({ success: true, data: result });
-  } catch (err) {
-    return jsonResponse({ success: false, error: err.message }, 500);
-  }
+function validateToken(token) {
+  const stored = PropertiesService.getScriptProperties().getProperty('API_TOKEN');
+  if (!stored || !token || stored.length !== token.length) return false;
+  let r = 0;
+  for (let i = 0; i < stored.length; i++) r |= stored.charCodeAt(i) ^ token.charCodeAt(i);
+  return r === 0;
 }
 
 /**
- * Maneja peticiones GET (lectura de datos)
- * Parámetro ?range=Inventario!A:K (o Categorías!A:D, Ventas!A:I)
+ * Comparación en tiempo constante de dos strings
+ */
+function constantTimeEquals(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
+// ========================
+// Request handlers
+// ========================
+
+/**
+ * GET: lectura de rangos (requiere token)
+ * ?token=...&range=Inventario!A:K
  */
 function doGet(e) {
   try {
-    var range = e && e.parameter && e.parameter.range;
+    const token = e && e.parameter && e.parameter.token;
+    if (!validateToken(token)) {
+      return jsonResponse({ success: false, error: 'Unauthorized' });
+    }
+
+    const range = e.parameter.range;
     if (!range) {
       return jsonResponse({ success: true, message: 'Garage Sale API activa', timestamp: new Date().toISOString() });
     }
 
-    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var values = ss.getRange(range).getValues();
+    const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+    const ss = SpreadsheetApp.openById(sheetId);
+    const values = ss.getRange(range).getValues();
 
-    // Filtrar filas completamente vacías
-    var filtered = values.filter(function(row) {
+    const filtered = values.filter(function(row) {
       return row.some(function(cell) { return cell !== ''; });
     });
 
@@ -72,22 +78,133 @@ function doGet(e) {
 }
 
 /**
+ * POST: escritura y acciones admin (requiere token)
+ * { token, action, ...payload }
+ */
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+
+    if (!validateToken(data.token)) {
+      return jsonResponse({ success: false, error: 'Unauthorized' });
+    }
+
+    switch (data.action) {
+      case 'adminLogin':
+        return jsonResponse({ success: true, data: handleAdminLogin(data) });
+      case 'adminLogout':
+        return jsonResponse({ success: true, data: handleAdminLogout(data) });
+      case 'registerSale':
+        return jsonResponse({ success: true, data: handleAdminWrite(data, function() { return registerSale(data); }) });
+      case 'markSold':
+        return jsonResponse({ success: true, data: handleAdminWrite(data, function() { return markSold(data.productIds); }) });
+      default:
+        return jsonResponse({ success: false, error: 'Acción no reconocida: ' + data.action });
+    }
+  } catch (err) {
+    return jsonResponse({ success: false, error: err.message });
+  }
+}
+
+// ========================
+// Sesiones Admin
+// ========================
+
+/**
+ * Verifica hash de contraseña, crea sesión server-side
+ */
+function handleAdminLogin(data) {
+  const props = PropertiesService.getScriptProperties();
+  const storedHash = props.getProperty('ADMIN_PASSWORD_HASH');
+
+  if (!constantTimeEquals(storedHash, data.passwordHash || '')) {
+    Utilities.sleep(500); // penalización anti-fuerza bruta
+    throw new Error('Credenciales inválidas');
+  }
+
+  const sessionToken = Utilities.getUuid();
+  props.setProperty(
+    'session_' + sessionToken,
+    JSON.stringify({ expiry: Date.now() + SESSION_TTL_MS })
+  );
+
+  return {
+    sessionToken: sessionToken,
+    expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString()
+  };
+}
+
+/**
+ * Invalida la sesión en el servidor
+ */
+function handleAdminLogout(data) {
+  if (data.sessionToken) {
+    PropertiesService.getScriptProperties().deleteProperty('session_' + data.sessionToken);
+  }
+  return { loggedOut: true };
+}
+
+/**
+ * Valida que la sesión exista y no haya expirado
+ */
+function validateAdminSession(sessionToken) {
+  if (!sessionToken) return false;
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty('session_' + sessionToken);
+  if (!raw) return false;
+  const session = JSON.parse(raw);
+  if (Date.now() > session.expiry) {
+    props.deleteProperty('session_' + sessionToken);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Wrapper: valida sesión antes de ejecutar operación de escritura
+ */
+function handleAdminWrite(data, operation) {
+  if (!validateAdminSession(data.sessionToken)) {
+    throw new Error('Sesión inválida o expirada');
+  }
+  return operation();
+}
+
+/**
+ * Limpia sesiones expiradas — configurar como trigger cada 6 horas
+ */
+function cleanupExpiredSessions() {
+  const props = PropertiesService.getScriptProperties();
+  const all = props.getProperties();
+  Object.keys(all)
+    .filter(function(k) { return k.startsWith('session_'); })
+    .forEach(function(k) {
+      try {
+        if (Date.now() > JSON.parse(all[k]).expiry) props.deleteProperty(k);
+      } catch (e) {
+        props.deleteProperty(k);
+      }
+    });
+}
+
+// ========================
+// Operaciones de datos
+// ========================
+
+/**
  * Registra una venta en la hoja "Ventas"
  */
 function registerSale(data) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const ss = SpreadsheetApp.openById(sheetId);
   const sheet = ss.getSheetByName('Ventas');
 
   if (!sheet) throw new Error('Hoja "Ventas" no encontrada');
 
-  // Generar ID único
   const lastRow = sheet.getLastRow();
   const id = 'V' + String(lastRow).padStart(4, '0');
-
-  // Fecha actual
   const fecha = Utilities.formatDate(new Date(), 'America/Mexico_City', 'yyyy-MM-dd HH:mm:ss');
 
-  // Agregar fila
   sheet.appendRow([
     id,
     fecha,
@@ -100,7 +217,6 @@ function registerSale(data) {
     data.buyer || ''
   ]);
 
-  // Si hay IDs de productos, marcarlos como vendidos
   if (data.productIds) {
     const ids = data.productIds.split(',').map(function(s) { return s.trim(); });
     markSold(ids);
@@ -115,7 +231,8 @@ function registerSale(data) {
 function markSold(productIds) {
   if (!productIds || productIds.length === 0) return { updated: 0 };
 
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const ss = SpreadsheetApp.openById(sheetId);
   const sheet = ss.getSheetByName('Inventario');
 
   if (!sheet) throw new Error('Hoja "Inventario" no encontrada');
@@ -130,7 +247,6 @@ function markSold(productIds) {
   }
 
   let updated = 0;
-
   for (let i = 1; i < data.length; i++) {
     if (productIds.indexOf(String(data[i][idCol])) !== -1) {
       sheet.getRange(i + 1, statusCol + 1).setValue('Vendido');
@@ -141,10 +257,11 @@ function markSold(productIds) {
   return { updated: updated };
 }
 
-/**
- * Construye respuesta JSON con headers CORS
- */
-function jsonResponse(data, code) {
+// ========================
+// Helper
+// ========================
+
+function jsonResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);

@@ -23,6 +23,9 @@ const App = (() => {
     if (typeof lucide !== 'undefined') {
       lucide.createIcons();
     }
+
+    // Señal para módulos de página que dependen de i18n (ej. CartPage)
+    window.dispatchEvent(new CustomEvent('app-ready'));
   }
 
   /**

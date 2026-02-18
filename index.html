@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Garage Sale — Venta de Garage</title>
   <meta name="description" content="Las mejores ofertas en artículos de segunda mano">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://cdn.tailwindcss.com 'unsafe-inline'; img-src 'self' https://placehold.co https://drive.google.com https://lh3.googleusercontent.com data:; connect-src 'self' https://sheets.googleapis.com https://script.google.com https://script.googleusercontent.com; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self';">
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script>
     tailwind.config = {
@@ -19,7 +20,7 @@
     }
   </script>
   <link rel="stylesheet" href="css/styles.css">
-  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.js"></script>
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.js" integrity="sha384-cztVf4nptt4arwI8Ixfn8naubPgxH22BSvA0CuqFUCulIT+dgnb18vSqiZbbPDL1" crossorigin="anonymous"></script>
 </head>
 <body class="bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-200 min-h-screen">
   <!-- Navbar -->
@@ -105,7 +106,6 @@
           &copy; 2025 Garage Sale. Todos los derechos reservados.
         </p>
         <div class="flex items-center gap-4">
-          <a href="admin.html" class="text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 text-sm">Admin</a>
         </div>
       </div>
     </div>

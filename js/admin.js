@@ -14,9 +14,11 @@ const Admin = (() => {
       return;
     }
 
-    showDashboard();
+    // Awaitar showDashboard para que loadProductChecklist() termine
+    // antes de intentar pre-seleccionar checkboxes desde params de URL
+    await showDashboard();
 
-    // Verificar si viene con params de registro rápido
+    // Verificar si viene con params de registro rápido (flow WhatsApp)
     const params = new URLSearchParams(window.location.search);
     if (params.get('registrar') === 'true') {
       switchTab('register');
@@ -29,12 +31,22 @@ const Admin = (() => {
   // ========================
 
   function isLoggedIn() {
-    return sessionStorage.getItem('admin-auth') === 'true';
+    const token = sessionStorage.getItem('admin-session-token');
+    const expiry = sessionStorage.getItem('admin-session-expiry');
+    if (!token || !expiry) return false;
+    return Date.now() < parseInt(expiry, 10);
   }
 
   function showLoginForm() {
     const container = document.getElementById('admin-content');
     if (!container) return;
+
+    const lockoutUntil = parseInt(localStorage.getItem('admin-login-lockout') || '0', 10);
+    const isLocked = Date.now() < lockoutUntil;
+    const minutesLeft = Math.ceil((lockoutUntil - Date.now()) / 60000);
+    const lockoutMsg = isLocked
+      ? `<p class="text-red-500 text-sm mt-2">Demasiados intentos fallidos. Intenta de nuevo en ${minutesLeft} minuto(s).</p>`
+      : '';
 
     container.innerHTML = `
       <div class="max-w-md mx-auto mt-20">
@@ -45,12 +57,13 @@ const Admin = (() => {
           </div>
           <form onsubmit="Admin.login(event)">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">${I18n.t('admin.password')}</label>
-            <input type="password" id="admin-password"
+            <input type="password" id="admin-password" ${isLocked ? 'disabled' : ''}
               class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
               autofocus>
             <p id="login-error" class="text-red-500 text-sm mt-2 hidden">${I18n.t('admin.wrongPassword')}</p>
-            <button type="submit"
-              class="w-full mt-4 py-3 rounded-xl font-semibold text-white bg-teal-600 hover:bg-teal-700 transition-colors">
+            ${lockoutMsg}
+            <button type="submit" ${isLocked ? 'disabled' : ''}
+              class="w-full mt-4 py-3 rounded-xl font-semibold text-white bg-teal-600 hover:bg-teal-700 transition-colors${isLocked ? ' opacity-50 cursor-not-allowed' : ''}">
               ${I18n.t('admin.enter')}
             </button>
           </form>
@@ -63,25 +76,91 @@ const Admin = (() => {
 
   async function login(e) {
     e.preventDefault();
+
+    // Rate limiting check
+    const lockoutUntil = parseInt(localStorage.getItem('admin-login-lockout') || '0', 10);
+    if (Date.now() < lockoutUntil) return;
+
     const password = document.getElementById('admin-password').value;
+    const errorEl = document.getElementById('login-error');
 
-    // Generar hash SHA-256
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    try {
+      // PBKDF2: derivar hash de la contraseña con el salt del servidor
+      const saltHex = CONFIG.ADMIN_PASSWORD_SALT;
+      const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+      const key = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(password),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveBits']
+      );
+      const hashBuffer = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100000 },
+        key,
+        256
+      );
+      const passwordHash = Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
 
-    if (hash === CONFIG.ADMIN_PASSWORD_HASH) {
-      sessionStorage.setItem('admin-auth', 'true');
+      // Enviar a Apps Script para validación server-side
+      const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: 'adminLogin',
+          token: CONFIG.API_TOKEN,
+          passwordHash
+        })
+      });
+
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error || 'Credenciales inválidas');
+
+      // Login exitoso: limpiar rate limiting y guardar sesión
+      localStorage.removeItem('admin-login-attempts');
+      localStorage.removeItem('admin-login-lockout');
+
+      const { sessionToken, expiresAt } = result.data;
+      sessionStorage.setItem('admin-session-token', sessionToken);
+      sessionStorage.setItem('admin-session-expiry', String(new Date(expiresAt).getTime()));
+
       showDashboard();
-    } else {
-      document.getElementById('login-error').classList.remove('hidden');
+    } catch (err) {
+      // Incrementar contador de intentos fallidos
+      const attempts = parseInt(localStorage.getItem('admin-login-attempts') || '0', 10) + 1;
+      localStorage.setItem('admin-login-attempts', String(attempts));
+
+      if (attempts >= 3) {
+        localStorage.setItem('admin-login-lockout', String(Date.now() + 5 * 60 * 1000));
+        localStorage.removeItem('admin-login-attempts');
+        showLoginForm(); // refrescar para mostrar estado bloqueado
+        return;
+      }
+
+      if (errorEl) errorEl.classList.remove('hidden');
     }
   }
 
   function logout() {
-    sessionStorage.removeItem('admin-auth');
+    const sessionToken = sessionStorage.getItem('admin-session-token');
+
+    // Notificar a Apps Script para invalidar la sesión (best effort)
+    if (sessionToken) {
+      fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: 'adminLogout',
+          token: CONFIG.API_TOKEN,
+          sessionToken
+        })
+      }).catch(() => {});
+    }
+
+    sessionStorage.removeItem('admin-session-token');
+    sessionStorage.removeItem('admin-session-expiry');
     showLoginForm();
   }
 

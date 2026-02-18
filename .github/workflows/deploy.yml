@@ -1,0 +1,54 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate config.js from template
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          API_KEY: ${{ secrets.API_KEY }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+          ADMIN_PASSWORD_SALT: ${{ secrets.ADMIN_PASSWORD_SALT }}
+          WHATSAPP_NUMBER: ${{ secrets.WHATSAPP_NUMBER }}
+        run: |
+          sed \
+            -e "s|%%SHEET_ID%%|${SHEET_ID}|g" \
+            -e "s|%%API_KEY%%|${API_KEY}|g" \
+            -e "s|%%APPS_SCRIPT_URL%%|${APPS_SCRIPT_URL}|g" \
+            -e "s|%%API_TOKEN%%|${API_TOKEN}|g" \
+            -e "s|%%ADMIN_PASSWORD_SALT%%|${ADMIN_PASSWORD_SALT}|g" \
+            -e "s|%%WHATSAPP_NUMBER%%|${WHATSAPP_NUMBER}|g" \
+            config.template.js > config.js
+          if grep -q '%%' config.js; then
+            echo "ERROR: placeholders sin reemplazar en config.js"
+            cat config.js
+            exit 1
+          fi
+          echo "config.js generado correctamente"
+
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - id: deployment
+        uses: actions/deploy-pages@v4
