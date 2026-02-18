@@ -36,7 +36,7 @@
 //   console.log('SALT:', saltHex);  // → GitHub Secret ADMIN_PASSWORD_SALT + Script Property
 //   console.log('HASH:', hashHex);  // → SOLO Script Property ADMIN_PASSWORD_HASH (nunca a git)
 
-const CONFIG = {
+window.CONFIG = {
   SHEET_ID: '%%SHEET_ID%%',
   API_KEY: '%%API_KEY%%',
   APPS_SCRIPT_URL: '%%APPS_SCRIPT_URL%%',
