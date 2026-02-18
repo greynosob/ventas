@@ -34,9 +34,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Template placeholders found:"
-          grep -o "%%[A-Z0-9_]\+%%" -n config.template.js | sort -u || true
-
           sed \
             -e "s|%%SHEET_ID%%|${SHEET_ID}|g" \
             -e "s|%%API_KEY%%|${API_KEY}|g" \
@@ -46,16 +43,15 @@ jobs:
             -e "s|%%WHATSAPP_NUMBER%%|${WHATSAPP_NUMBER}|g" \
             config.template.js > config.js
 
-          echo "Remaining placeholders in generated config.js:"
-          grep -o "%%[A-Z0-9_]\+%%" -n config.js | sort -u || true
-
-          if grep -q '%%' config.js; then
-            echo "ERROR: placeholders sin reemplazar en config.js"
+          # Falla solo si alguno de los placeholders reales sigue presente
+          if grep -Eq '%%(SHEET_ID|API_KEY|APPS_SCRIPT_URL|API_TOKEN|ADMIN_PASSWORD_SALT|WHATSAPP_NUMBER)%%' config.js; then
+            echo "ERROR: placeholders de CONFIG sin reemplazar en config.js"
+            grep -nE '%%(SHEET_ID|API_KEY|APPS_SCRIPT_URL|API_TOKEN|ADMIN_PASSWORD_SALT|WHATSAPP_NUMBER)%%' config.js || true
             exit 1
           fi
 
-          echo "OK: config.js generado"
-          ls -la config.js
+          echo "config.js generado correctamente"
+
 
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
