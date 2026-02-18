@@ -1,27 +1,22 @@
 # Garage Sale
 
-Sitio web de venta de garage construido con HTML, CSS (Tailwind) y JavaScript vanilla, usando **Google Sheets** como base de datos y **Google Apps Script** como backend de escritura.
+Sitio web de venta de garage construido con HTML, CSS (Tailwind) y JavaScript vanilla, usando **Google Sheets** como base de datos y **Google Apps Script** como backend de escritura. Se despliega automáticamente en **GitHub Pages** vía CI/CD.
 
 ## Stack Tecnológico
 
 - **Frontend:** HTML5, JavaScript vanilla (ES6+), Tailwind CSS 3.4
 - **Iconos:** Lucide Icons
 - **Gráficas:** Chart.js (panel de administración)
-- **Backend:** Google Sheets API (lectura) + Google Apps Script (escritura)
-- **Hosting:** Cualquier servidor estático (GitHub Pages, Netlify, etc.)
+- **Backend:** Google Sheets API (lectura pública) + Google Apps Script (escritura autenticada)
+- **Hosting:** GitHub Pages (deploy automático con GitHub Actions)
 
-## Prerrequisitos
+---
 
-- Cuenta de Google
-- Proyecto en Google Cloud Console con la API de Google Sheets habilitada
-- API Key de Google Cloud
-- Google Apps Script desplegado como Web App
-
-## Configuración
+## Configuración Inicial
 
 ### 1. Crear la hoja de Google Sheets
 
-Crea una nueva hoja de cálculo en [Google Sheets](https://sheets.google.com) con **3 pestañas**:
+Crea una nueva hoja en [Google Sheets](https://sheets.google.com) con **3 pestañas**:
 
 **Pestaña "Inventario"** (columnas A–K):
 
@@ -38,145 +33,283 @@ Crea una nueva hoja de cálculo en [Google Sheets](https://sheets.google.com) co
 | ID | Fecha | ProductoIDs | Títulos | Total | Origen | MétodoPago | Notas | Comprador |
 |----|-------|-------------|---------|-------|--------|------------|-------|-----------|
 
-> Copia las cabeceras **tal cual** en la fila 1 de cada pestaña. Los acentos importan.
+> Copia las cabeceras **tal cual** en la fila 1. Los acentos importan.
 
-#### Datos de ejemplo
-
-Para verificar que todo funciona, agrega estas filas de ejemplo debajo de las cabeceras:
+<details>
+<summary>Datos de ejemplo para verificar</summary>
 
 **Inventario** (fila 2):
 
-| A | B | C | D | E | F | G | H | I | J | K |
-|---|---|---|---|---|---|---|---|---|---|---|
-| P001 | Silla de madera | Silla rústica en buen estado | Silla de madera de pino, estilo rústico. Tiene algunas marcas de uso pero está firme y funcional. | 150 | 300 | Muebles | silla,madera,rústico | | Disponible | 2026-01-15 |
+| P001 | Silla de madera | Silla rústica en buen estado | Silla de madera de pino, estilo rústico. | 150 | 300 | Muebles | silla,madera | | Disponible | 2026-01-15 |
 
 **Categorías** (fila 2):
 
-| A | B | C | D |
-|---|---|---|---|
 | C001 | Muebles | | Mesas, sillas, libreros y más |
 
-**Ventas** (fila 2):
+> La columna **Imágenes** puede quedar vacía (muestra placeholder). La columna **Estado** vacía equivale a "Disponible". El valor de **Categoría** en Inventario debe coincidir exactamente con **Nombre** en Categorías.
+</details>
 
-| A | B | C | D | E | F | G | H | I |
-|---|---|---|---|---|---|---|---|---|
-| V001 | 2026-02-10 14:30:00 | P001 | Silla de madera | 150 | WhatsApp | Efectivo | | Juan |
+---
 
-> **Notas:** La columna **Imágenes** puede quedar vacía (se muestra un placeholder gris). La columna **Estado** puede quedar vacía (se asume "Disponible"). Lo importante es que la **Categoría** del producto coincida exactamente con el **Nombre** en la pestaña Categorías.
-
-### 2. Obtener una API Key de Google Cloud
+### 2. Obtener API Key de Google Cloud
 
 1. Ve a [Google Cloud Console](https://console.cloud.google.com)
 2. Crea un proyecto nuevo (o usa uno existente)
-3. Navega a **APIs y servicios → Biblioteca** y habilita **Google Sheets API**
-4. Ve a **APIs y servicios → Credenciales → Crear credenciales → API Key**
-5. (Opcional) Restringe la key a "Google Sheets API" y a tu dominio
+3. **APIs y servicios → Biblioteca** → habilitar **Google Sheets API**
+4. **APIs y servicios → Credenciales → Crear credenciales → API Key**
+5. Guarda la key — la necesitarás en el Paso 5
 
-### 3. Desplegar Google Apps Script
+> **Restricción recomendada:** Una vez desplegado el sitio, regresa a esta key y restringe:
+> - *Application restrictions* → Websites → `https://tu-usuario.github.io/*`
+> - *API restrictions* → Restrict key → solo "Google Sheets API"
+
+---
+
+### 3. Generar las credenciales de seguridad
+
+Necesitas generar dos valores antes de continuar. Guárdalos en un lugar seguro.
+
+#### API Token (secreto compartido frontend ↔ Apps Script)
+
+Ejecuta en una terminal con Node.js:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Guarda el resultado (64 caracteres hex). Este valor va tanto en GitHub Secrets como en Apps Script Properties.
+
+#### Hash PBKDF2 de la contraseña admin
+
+Abre la consola del navegador (`F12`) y ejecuta:
+
+```js
+const password = 'TuContraseñaReal123!';  // ← cambia esto
+const salt = crypto.getRandomValues(new Uint8Array(16));
+const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2,'0')).join('');
+const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveBits']);
+const hash = await crypto.subtle.deriveBits({name:'PBKDF2', hash:'SHA-256', salt, iterations:100000}, key, 256);
+const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+console.log('SALT:', saltHex);
+console.log('HASH:', hashHex);
+```
+
+- **SALT** → va a GitHub Secrets (`ADMIN_PASSWORD_SALT`) y a Apps Script Properties
+- **HASH** → va **solo** a Apps Script Properties (nunca a git)
+
+> Usa una contraseña fuerte: mínimo 16 caracteres, mayúsculas, números y símbolos.
+
+---
+
+### 4. Desplegar Google Apps Script
 
 1. Abre [Google Apps Script](https://script.google.com) y crea un proyecto nuevo
 2. Copia el contenido de `google-apps-script/Code.gs` en el editor
-3. Reemplaza el `SPREADSHEET_ID` con el ID de tu Google Sheet
-4. Ve a **Deploy → New deployment → Web app**
+3. Ve a **Configuración del proyecto (⚙️) → Propiedades del script** y agrega:
+
+| Propiedad | Valor |
+|---|---|
+| `API_TOKEN` | El token generado en el Paso 3 |
+| `SHEET_ID` | El ID de tu Google Sheet (está en la URL: `/spreadsheets/d/[ID]/edit`) |
+| `ADMIN_PASSWORD_HASH` | El HASH generado en el Paso 3 |
+| `ADMIN_PASSWORD_SALT` | El SALT generado en el Paso 3 |
+
+4. Ve a **Implementar → Nueva implementación → Aplicación web**
    - Ejecutar como: **Yo**
    - Quién tiene acceso: **Cualquiera**
-5. Copia la URL del despliegue
+5. Copia la URL de la implementación
 
-### 4. Configurar `config.js`
+> **Trigger de limpieza:** Ve a **Activadores → Añadir activador** y configura:
+> - Función: `cleanupExpiredSessions` | Basado en tiempo | Cada 6 horas
 
-Abre `config.js` y reemplaza los siguientes valores:
+---
 
-```js
-SHEET_ID: 'TU_ID_DE_GOOGLE_SHEET',        // El ID está en la URL: /spreadsheets/d/[ID]/edit
-API_KEY: 'TU_API_KEY_DE_GOOGLE_CLOUD',
-APPS_SCRIPT_URL: 'https://script.google.com/macros/s/.../exec',
-WHATSAPP_NUMBER: '521234567890',            // Tu número con código de país, sin +
-ADMIN_PASSWORD_HASH: '...',                 // Hash SHA-256 de tu contraseña
+### 5. Configurar GitHub Secrets
+
+En tu repositorio de GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret | Valor |
+|---|---|
+| `SHEET_ID` | ID del Google Sheet |
+| `API_KEY` | API Key de Google Cloud |
+| `APPS_SCRIPT_URL` | URL del Apps Script desplegado |
+| `API_TOKEN` | El token generado en el Paso 3 |
+| `ADMIN_PASSWORD_SALT` | El SALT generado en el Paso 3 |
+| `WHATSAPP_NUMBER` | Tu número de WhatsApp con código de país, sin `+` (ej: `521234567890`) |
+
+---
+
+### 6. Habilitar GitHub Pages
+
+1. En tu repositorio: **Settings → Pages**
+2. En **Source** selecciona: **GitHub Actions**
+3. Haz push a `main` — el workflow generará `config.js` automáticamente desde los Secrets y desplegará el sitio
+
+> `config.js` nunca se commitea al repositorio. Se genera en cada deploy. Para desarrollo local, crea `config.js` manualmente copiando `config.template.js` y reemplazando los `%%PLACEHOLDERS%%`.
+
+---
+
+## Panel de Administración
+
+### Acceso
+
+La URL del panel es:
+
+```
+https://tu-usuario.github.io/tu-repo/_panel/
 ```
 
-Para generar el hash de la contraseña, ejecuta esto en la consola del navegador:
+> `admin.html` también funciona como punto de entrada: redirige automáticamente a `_panel/` preservando los parámetros de URL. El enlace no aparece en el footer público del sitio.
 
-```js
-crypto.subtle.digest('SHA-256', new TextEncoder().encode('tu_password'))
-  .then(h => console.log(Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join('')))
-```
+---
+
+### Login
+
+Al ingresar a `_panel/` se muestra el formulario de contraseña.
+
+**Cómo funciona la autenticación:**
+1. Ingresas tu contraseña
+2. El navegador calcula un hash PBKDF2 (100,000 iteraciones, SHA-256) usando el salt de configuración
+3. El hash se envía a Apps Script para validación — la contraseña nunca viaja en texto plano
+4. Si es correcto, Apps Script crea una sesión con token único válido por **8 horas**
+5. El token se guarda en `sessionStorage` (se elimina al cerrar el tab)
+
+**Rate limiting:** 3 intentos fallidos bloquean el formulario por 5 minutos.
+
+---
+
+### Dashboard — Pestaña "Dashboard"
+
+Muestra un resumen completo de las ventas:
+
+**KPIs (tarjetas superiores):**
+- Ventas de hoy
+- Ventas de los últimos 7 días
+- Ventas del mes actual
+- Total acumulado
+
+**Gráficas:**
+- Ventas por categoría (barras)
+- Ventas por origen (pastel): Facebook, WhatsApp, Instagram, etc.
+- Ventas por método de pago (pastel): Efectivo, Transferencia
+
+**Tabla de últimas ventas:** las 20 ventas más recientes con todos los campos.
+
+**Exportar CSV:** botón en la esquina superior derecha. Descarga todas las ventas en formato CSV con BOM (compatible con Excel).
+
+---
+
+### Dashboard — Pestaña "Registrar Venta"
+
+Permite registrar manualmente una venta.
+
+**Campos del formulario:**
+
+| Campo | Descripción |
+|---|---|
+| Buscar / seleccionar productos | Lista de todos los productos disponibles con checkboxes. Puedes filtrar por nombre. Al seleccionar, muestra el total acumulado. |
+| Origen | De dónde viene el comprador: Facebook, WhatsApp, Grupo de mamás, Instagram, Referido, Otro |
+| Método de pago | Efectivo o Transferencia |
+| Comprador | Nombre del comprador (opcional) |
+| Notas | Observaciones adicionales (opcional) |
+
+Al confirmar:
+1. Se registra la venta en la hoja "Ventas" con ID automático y fecha
+2. Los productos seleccionados se marcan como "Vendido" en la hoja "Inventario"
+3. El dashboard se recarga con los datos actualizados
+
+---
+
+### Flujo WhatsApp → Registrar Venta
+
+Este flujo permite registrar una venta directamente desde el mensaje de WhatsApp que envía un comprador:
+
+1. **El comprador** agrega productos al carrito y hace clic en **"Enviar por WhatsApp"**
+2. Se abre WhatsApp con un mensaje que incluye el resumen del pedido y un **link de registro**
+3. **El vendedor** hace clic en ese link
+4. Se abre `_panel/` con la pestaña "Registrar venta" activa y los productos del pedido **ya seleccionados**
+5. El vendedor solo elige el método de pago, agrega el nombre del comprador (si desea) y confirma
+
+> El link tiene la forma: `_panel/?registrar=true&ids=P001,P002&total=300`
+
+---
+
+### Cerrar Sesión
+
+Botón **"Cerrar sesión"** en la esquina superior del dashboard. Al hacer clic:
+- La sesión se invalida en el servidor (Apps Script elimina el token)
+- Se limpia `sessionStorage`
+- Se regresa al formulario de login
+
+Las sesiones también expiran automáticamente después de 8 horas aunque no se cierre sesión explícitamente.
+
+---
 
 ## Desarrollo Local
 
-Tres opciones para servir el sitio localmente:
-
 ```bash
-# Opción 1: npm (requiere Node.js)
+# Opción 1: npm
 npm start
 
 # Opción 2: Python
 python -m http.server 3000
 
-# Opción 3: VS Code
-# Instalar la extensión "Live Server" y hacer clic en "Go Live"
+# Opción 3: VS Code — extensión "Live Server" → "Go Live"
 ```
 
-## Despliegue en GitHub Pages
+Para desarrollo local necesitas crear `config.js` manualmente:
 
-1. Crea un repositorio en GitHub
-2. Sube el código:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/tu-usuario/tu-repo.git
-   git push -u origin main
-   ```
-3. Ve a **Settings → Pages** en tu repositorio
-4. En **Source** selecciona la rama `main` y carpeta `/ (root)`
-5. (Recomendado) En Google Cloud Console, restringe tu API Key al dominio `tu-usuario.github.io`
+```bash
+cp config.template.js config.js
+# Editar config.js y reemplazar los %%PLACEHOLDERS%% con valores reales
+```
+
+`config.js` está en `.gitignore` — nunca se commitea.
+
+---
 
 ## Funcionalidad por Página
 
 ### Inicio (`index.html`)
-
 - Hero section con gradiente y CTA
-- Carrusel de ofertas destacadas (productos con descuento)
+- Carrusel de ofertas destacadas (productos con `PrecioAnterior > Precio`)
 - Grid de categorías destacadas
 - Toggle dark/light mode
 
 ### Productos (`productos.html`)
-
-- Grid responsive de productos (2–5 columnas según pantalla)
-- Filtrado por categoría y por ofertas
-- Modal de detalle con galería de imágenes
+- Grid responsive (2–5 columnas)
+- Filtrado por categoría y por ofertas via URL params
+- Modal de detalle con galería de imágenes navegable (teclado y click)
 - Botón de agregar al carrito
 
 ### Categorías (`categorias.html`)
-
-- Cards de categorías con conteo de productos y ofertas
-- Enlace directo a productos filtrados por categoría
+- Cards con conteo de productos disponibles y en oferta
+- Enlace directo a productos filtrados
 
 ### Carrito (`carrito.html`)
+- Tabla en desktop, cards en móvil
+- Gestión de cantidades (+/−)
+- Checkout vía WhatsApp con resumen del pedido y link de registro
+- Vaciado de carrito con confirmación
 
-- Vista tabla en desktop, cards en móvil
-- Gestión de cantidades (+/-)
-- Checkout vía WhatsApp (genera mensaje con el resumen del pedido)
-- Botón para vaciar carrito
-
-### Admin (`admin.html`)
-
-- Login con contraseña protegida por hash SHA-256
-- Dashboard con KPIs (ventas totales, ingresos, ticket promedio, etc.)
-- Gráficas de ventas con Chart.js (por día, por categoría, por método de pago)
-- Registro manual de ventas con auto-completado desde WhatsApp
-- Exportación de ventas a CSV
+### Panel Admin (`_panel/index.html`)
+- Autenticación PBKDF2 + sesión server-side (8h)
+- Rate limiting: 3 intentos fallidos → bloqueo 5 min
+- Dashboard: KPIs, 3 gráficas Chart.js, tabla de últimas ventas
+- Registro de ventas con checklist de productos y filtro de búsqueda
+- Flujo rápido desde link de WhatsApp (productos pre-seleccionados)
+- Exportación CSV con BOM
 
 ### Funcionalidad Global
-
-- Navbar responsive con menú hamburguesa
+- Navbar responsive con menú hamburguesa y dropdown de categorías
 - Búsqueda en tiempo real con resaltado de coincidencias
 - Toggle dark/light mode (persiste en `localStorage`)
-- Badge de carrito con conteo de items
+- Badge de carrito con conteo
 - Notificaciones toast
-- Sistema i18n (internacionalización)
-- Caché de datos con TTL configurable
+- Sistema i18n (`i18n/es.json`)
+- Caché de datos con TTL configurable (5 min por defecto)
+
+---
 
 ## Estructura del Proyecto
 
@@ -186,10 +319,16 @@ ventas/
 ├── productos.html                # Catálogo de productos
 ├── categorias.html               # Vista de categorías
 ├── carrito.html                  # Carrito de compras
-├── admin.html                    # Panel de administración
-├── config.js                     # Configuración central (API keys, Sheet ID)
-├── package.json                  # Metadata del proyecto y scripts
-├── .gitignore                    # Archivos ignorados por git
+├── admin.html                    # Redirect a _panel/ (preserva query string)
+├── config.template.js            # Template de configuración con placeholders
+├── .nojekyll                     # Habilita directorios _ en GitHub Pages
+├── package.json                  # Metadata y scripts del proyecto
+├── .gitignore                    # config.js y otros archivos ignorados
+├── .github/
+│   └── workflows/
+│       └── deploy.yml            # CI/CD: genera config.js desde Secrets y despliega
+├── _panel/
+│   └── index.html                # Panel de administración (ruta no obvia)
 ├── css/
 │   └── styles.css                # Estilos personalizados y animaciones
 ├── js/
@@ -207,18 +346,28 @@ ventas/
 ├── i18n/
 │   └── es.json                   # Traducciones en español
 ├── images/
-│   └── productos/                # Imágenes de productos (opcional)
+│   └── productos/                # Imágenes locales de productos (opcional)
 └── google-apps-script/
-    └── Code.gs                   # Google Apps Script (backend de escritura)
+    └── Code.gs                   # Backend: validación de token + sesiones + escritura
 ```
 
-## Nota de Seguridad
+> `config.js` no aparece en el árbol porque está en `.gitignore`. Se genera automáticamente en cada deploy.
 
-**No subas API keys reales a repositorios públicos.** Si tu repositorio es público:
+---
 
-- Usa restricciones de dominio en tu API Key de Google Cloud
-- Considera usar variables de entorno o un archivo `config.local.js` excluido en `.gitignore`
-- El hash de la contraseña de admin no reemplaza la autenticación real del lado del servidor — esta es una medida básica para un proyecto personal
+## Seguridad
+
+| Medida | Implementación |
+|---|---|
+| Credenciales fuera de git | `config.js` generado en CI/CD desde GitHub Secrets |
+| Apps Script autenticado | Token compartido validado en tiempo constante (anti-timing attack) |
+| Contraseña admin | Hash PBKDF2 (100k iteraciones) — nunca va al repositorio |
+| Sesiones server-side | Token UUID en Apps Script Properties, TTL 8h |
+| Rate limiting | 3 intentos fallidos → bloqueo 5 min (localStorage) |
+| Panel en ruta no obvia | `_panel/` — sin enlace público en el sitio |
+| Content Security Policy | Meta tag CSP en todas las páginas |
+| Subresource Integrity | `integrity` + `crossorigin` en Lucide y Chart.js |
+| API Key restringida | Solo Sheets API + dominio de GitHub Pages |
 
 ---
 
@@ -227,24 +376,19 @@ ventas/
 
 # Garage Sale
 
-A garage sale e-commerce website built with HTML, CSS (Tailwind), and vanilla JavaScript, using **Google Sheets** as its database and **Google Apps Script** as a write backend.
+A garage sale e-commerce website built with HTML, CSS (Tailwind), and vanilla JavaScript, using **Google Sheets** as its database and **Google Apps Script** as a write backend. Automatically deployed to **GitHub Pages** via CI/CD.
 
 ## Tech Stack
 
 - **Frontend:** HTML5, vanilla JavaScript (ES6+), Tailwind CSS 3.4
 - **Icons:** Lucide Icons
 - **Charts:** Chart.js (admin panel)
-- **Backend:** Google Sheets API (read) + Google Apps Script (write)
-- **Hosting:** Any static server (GitHub Pages, Netlify, etc.)
+- **Backend:** Google Sheets API (public read) + Google Apps Script (authenticated write)
+- **Hosting:** GitHub Pages (automatic deploy via GitHub Actions)
 
-## Prerequisites
+---
 
-- Google account
-- Google Cloud Console project with Google Sheets API enabled
-- Google Cloud API Key
-- Google Apps Script deployed as a Web App
-
-## Setup
+## Initial Setup
 
 ### 1. Create the Google Sheet
 
@@ -265,145 +409,203 @@ Create a new spreadsheet in [Google Sheets](https://sheets.google.com) with **3 
 | ID | Fecha | ProductoIDs | Títulos | Total | Origen | MétodoPago | Notas | Comprador |
 |----|-------|-------------|---------|-------|--------|------------|-------|-----------|
 
-> Copy the headers **exactly** as shown in row 1 of each tab. Accents matter.
+> Copy headers **exactly** as shown in row 1. Accented characters matter.
 
-#### Sample Data
-
-To verify everything works, add these sample rows below the headers:
-
-**Inventario** (row 2):
-
-| A | B | C | D | E | F | G | H | I | J | K |
-|---|---|---|---|---|---|---|---|---|---|---|
-| P001 | Silla de madera | Silla rústica en buen estado | Silla de madera de pino, estilo rústico. Tiene algunas marcas de uso pero está firme y funcional. | 150 | 300 | Muebles | silla,madera,rústico | | Disponible | 2026-01-15 |
-
-**Categorías** (row 2):
-
-| A | B | C | D |
-|---|---|---|---|
-| C001 | Muebles | | Mesas, sillas, libreros y más |
-
-**Ventas** (row 2):
-
-| A | B | C | D | E | F | G | H | I |
-|---|---|---|---|---|---|---|---|---|
-| V001 | 2026-02-10 14:30:00 | P001 | Silla de madera | 150 | WhatsApp | Efectivo | | Juan |
-
-> **Notes:** The **Imágenes** column can be left empty (a gray placeholder is shown). The **Estado** column can be left empty (defaults to "Disponible"). The **Categoría** value in Inventario must match a **Nombre** in the Categorías tab exactly.
+---
 
 ### 2. Get a Google Cloud API Key
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project (or use an existing one)
-3. Navigate to **APIs & Services → Library** and enable **Google Sheets API**
-4. Go to **APIs & Services → Credentials → Create Credentials → API Key**
-5. (Optional) Restrict the key to "Google Sheets API" and your domain
+2. Create or select a project
+3. **APIs & Services → Library** → enable **Google Sheets API**
+4. **APIs & Services → Credentials → Create Credentials → API Key**
+5. Save the key for Step 5
 
-### 3. Deploy Google Apps Script
+> **Recommended restriction:** Once deployed, restrict the key to your GitHub Pages domain and to the Sheets API only.
+
+---
+
+### 3. Generate Security Credentials
+
+#### API Token
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Save the 64-char hex result. Goes to both GitHub Secrets and Apps Script Properties.
+
+#### Admin Password PBKDF2 Hash
+
+Run in the browser console:
+
+```js
+const password = 'YourRealPassword123!';
+const salt = crypto.getRandomValues(new Uint8Array(16));
+const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2,'0')).join('');
+const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveBits']);
+const hash = await crypto.subtle.deriveBits({name:'PBKDF2', hash:'SHA-256', salt, iterations:100000}, key, 256);
+const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+console.log('SALT:', saltHex);
+console.log('HASH:', hashHex);
+```
+
+- **SALT** → GitHub Secrets (`ADMIN_PASSWORD_SALT`) and Apps Script Properties
+- **HASH** → Apps Script Properties **only** (never committed to git)
+
+---
+
+### 4. Deploy Google Apps Script
 
 1. Open [Google Apps Script](https://script.google.com) and create a new project
-2. Copy the contents of `google-apps-script/Code.gs` into the editor
-3. Replace `SPREADSHEET_ID` with your Google Sheet ID
-4. Go to **Deploy → New deployment → Web app**
+2. Paste the contents of `google-apps-script/Code.gs`
+3. Go to **Project Settings (⚙️) → Script Properties** and add:
+
+| Property | Value |
+|---|---|
+| `API_TOKEN` | Token from Step 3 |
+| `SHEET_ID` | Your Google Sheet ID |
+| `ADMIN_PASSWORD_HASH` | HASH from Step 3 |
+| `ADMIN_PASSWORD_SALT` | SALT from Step 3 |
+
+4. **Deploy → New deployment → Web app**
    - Execute as: **Me**
    - Who has access: **Anyone**
 5. Copy the deployment URL
 
-### 4. Configure `config.js`
+> **Cleanup trigger:** Triggers → Add Trigger → `cleanupExpiredSessions` → Time-driven → Every 6 hours
 
-Open `config.js` and replace the following values:
+---
 
-```js
-SHEET_ID: 'YOUR_GOOGLE_SHEET_ID',           // The ID is in the URL: /spreadsheets/d/[ID]/edit
-API_KEY: 'YOUR_GOOGLE_CLOUD_API_KEY',
-APPS_SCRIPT_URL: 'https://script.google.com/macros/s/.../exec',
-WHATSAPP_NUMBER: '521234567890',             // Your number with country code, no +
-ADMIN_PASSWORD_HASH: '...',                  // SHA-256 hash of your password
+### 5. Configure GitHub Secrets
+
+Repository **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Value |
+|---|---|
+| `SHEET_ID` | Google Sheet ID |
+| `API_KEY` | Google Cloud API Key |
+| `APPS_SCRIPT_URL` | Apps Script deployment URL |
+| `API_TOKEN` | Token from Step 3 |
+| `ADMIN_PASSWORD_SALT` | SALT from Step 3 |
+| `WHATSAPP_NUMBER` | WhatsApp number with country code, no `+` (e.g. `521234567890`) |
+
+---
+
+### 6. Enable GitHub Pages
+
+1. Repository **Settings → Pages**
+2. **Source** → **GitHub Actions**
+3. Push to `main` — the workflow generates `config.js` from Secrets and deploys automatically
+
+> For local development: `cp config.template.js config.js` and replace `%%PLACEHOLDERS%%` manually. `config.js` is in `.gitignore` and is never committed.
+
+---
+
+## Admin Panel
+
+### Access
+
+```
+https://your-user.github.io/your-repo/_panel/
 ```
 
-To generate the password hash, run this in your browser console:
+> `admin.html` also works as an entry point — it redirects to `_panel/` preserving URL parameters. There is no public link to the admin panel in the site footer.
 
-```js
-crypto.subtle.digest('SHA-256', new TextEncoder().encode('your_password'))
-  .then(h => console.log(Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join('')))
-```
+---
+
+### Login
+
+**How authentication works:**
+1. You enter your password
+2. The browser computes a PBKDF2 hash (100,000 iterations, SHA-256) using the configured salt
+3. The hash is sent to Apps Script for server-side validation — the password never travels in plain text
+4. On success, Apps Script creates a session with a unique token valid for **8 hours**
+5. The token is stored in `sessionStorage` (cleared when the tab is closed)
+
+**Rate limiting:** 3 failed attempts lock the form for 5 minutes.
+
+---
+
+### Dashboard Tab
+
+**KPI cards:**
+- Sales today
+- Sales last 7 days
+- Sales this month
+- All-time total
+
+**Charts:**
+- Sales by category (bar)
+- Sales by origin (pie): Facebook, WhatsApp, Instagram, etc.
+- Sales by payment method (pie)
+
+**Recent sales table:** last 20 sales with all fields.
+
+**Export CSV:** top-right button. Downloads all sales as a BOM-encoded CSV (Excel-compatible).
+
+---
+
+### Register Sale Tab
+
+| Field | Description |
+|---|---|
+| Product checklist | All available products with checkboxes. Type to filter. Running total shown when items are selected. |
+| Origin | Where the buyer came from: Facebook, WhatsApp, Moms group, Instagram, Referral, Other |
+| Payment method | Cash or Transfer |
+| Buyer | Buyer name (optional) |
+| Notes | Additional notes (optional) |
+
+On confirm:
+1. Sale is recorded in the "Ventas" sheet with auto-generated ID and timestamp
+2. Selected products are marked "Vendido" in the "Inventario" sheet
+3. Dashboard reloads with updated data
+
+---
+
+### WhatsApp → Register Sale Flow
+
+1. **Buyer** adds items to cart and clicks **"Send via WhatsApp"**
+2. WhatsApp opens with an order summary and a **registration link**
+3. **Seller** taps that link
+4. `_panel/` opens with the "Register sale" tab active and the buyer's products **pre-selected**
+5. Seller selects payment method, optionally adds buyer name, and confirms
+
+> The link looks like: `_panel/?registrar=true&ids=P001,P002&total=300`
+
+---
+
+### Logout
+
+The **"Cerrar sesión"** (Logout) button is in the top-right of the dashboard. On click:
+- The session is invalidated on the server (Apps Script deletes the token)
+- `sessionStorage` is cleared
+- Returns to the login form
+
+Sessions also expire automatically after 8 hours.
+
+---
 
 ## Local Development
 
-Three options to serve the site locally:
-
 ```bash
-# Option 1: npm (requires Node.js)
+# Option 1: npm
 npm start
 
 # Option 2: Python
 python -m http.server 3000
 
-# Option 3: VS Code
-# Install the "Live Server" extension and click "Go Live"
+# Option 3: VS Code — install "Live Server" extension → "Go Live"
 ```
 
-## GitHub Pages Deployment
+For local dev, create `config.js` manually:
 
-1. Create a repository on GitHub
-2. Push the code:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/your-user/your-repo.git
-   git push -u origin main
-   ```
-3. Go to **Settings → Pages** in your repository
-4. Under **Source**, select the `main` branch and `/ (root)` folder
-5. (Recommended) In Google Cloud Console, restrict your API Key to the domain `your-user.github.io`
+```bash
+cp config.template.js config.js
+# Edit config.js and replace %%PLACEHOLDERS%% with real values
+```
 
-## Page Functionality
-
-### Home (`index.html`)
-
-- Hero section with gradient and CTA
-- Featured offers carousel (discounted products)
-- Featured categories grid
-- Dark/light mode toggle
-
-### Products (`productos.html`)
-
-- Responsive product grid (2–5 columns based on screen size)
-- Category and offer filtering
-- Detail modal with image gallery
-- Add to cart button
-
-### Categories (`categorias.html`)
-
-- Category cards with product and offer counts
-- Direct link to category-filtered products
-
-### Cart (`carrito.html`)
-
-- Table view on desktop, cards on mobile
-- Quantity management (+/-)
-- WhatsApp checkout (generates message with order summary)
-- Clear cart button
-
-### Admin (`admin.html`)
-
-- SHA-256 hash-protected password login
-- Dashboard with KPIs (total sales, revenue, average ticket, etc.)
-- Sales charts with Chart.js (by day, category, payment method)
-- Manual sale registration with WhatsApp auto-fill
-- CSV export of sales data
-
-### Global Features
-
-- Responsive navbar with hamburger menu
-- Real-time search with match highlighting
-- Dark/light mode toggle (persisted in `localStorage`)
-- Cart badge with item count
-- Toast notifications
-- i18n (internationalization) system
-- Data cache with configurable TTL
+---
 
 ## Project Structure
 
@@ -413,10 +615,16 @@ ventas/
 ├── productos.html                # Product catalog
 ├── categorias.html               # Categories view
 ├── carrito.html                  # Shopping cart
-├── admin.html                    # Admin panel
-├── config.js                     # Central config (API keys, Sheet ID)
+├── admin.html                    # Redirect to _panel/ (preserves query string)
+├── config.template.js            # Config template with placeholders
+├── .nojekyll                     # Enables _ directories on GitHub Pages
 ├── package.json                  # Project metadata and scripts
-├── .gitignore                    # Git-ignored files
+├── .gitignore                    # config.js and other ignored files
+├── .github/
+│   └── workflows/
+│       └── deploy.yml            # CI/CD: generates config.js from Secrets and deploys
+├── _panel/
+│   └── index.html                # Admin panel (non-obvious URL)
 ├── css/
 │   └── styles.css                # Custom styles and animations
 ├── js/
@@ -434,17 +642,27 @@ ventas/
 ├── i18n/
 │   └── es.json                   # Spanish translations
 ├── images/
-│   └── productos/                # Product images (optional)
+│   └── productos/                # Local product images (optional)
 └── google-apps-script/
-    └── Code.gs                   # Google Apps Script (write backend)
+    └── Code.gs                   # Backend: token validation + sessions + write ops
 ```
 
-## Security Note
+> `config.js` is not in the tree because it is in `.gitignore`. It is generated automatically on every deploy.
 
-**Do not commit real API keys to public repositories.** If your repository is public:
+---
 
-- Use domain restrictions on your Google Cloud API Key
-- Consider using environment variables or a `config.local.js` file excluded in `.gitignore`
-- The admin password hash does not replace real server-side authentication — this is a basic measure for a personal project
+## Security
+
+| Measure | Implementation |
+|---|---|
+| Credentials out of git | `config.js` generated at deploy time from GitHub Secrets |
+| Authenticated Apps Script | Shared token validated with constant-time comparison (anti-timing attack) |
+| Admin password | PBKDF2 hash (100k iterations) — never stored in the repository |
+| Server-side sessions | UUID token in Apps Script Properties, 8h TTL |
+| Rate limiting | 3 failed attempts → 5-minute lockout (localStorage) |
+| Admin at non-obvious URL | `_panel/` — no public link in the site |
+| Content Security Policy | CSP meta tag on all pages |
+| Subresource Integrity | `integrity` + `crossorigin` on Lucide and Chart.js CDN scripts |
+| Restricted API Key | Sheets API only + GitHub Pages domain |
 
 </details>
