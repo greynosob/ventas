@@ -432,7 +432,7 @@ Create a new spreadsheet in [Google Sheets](https://sheets.google.com) with **3 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
-
+ 
 Save the 64-char hex result. Goes to both GitHub Secrets and Apps Script Properties.
 
 #### Admin Password PBKDF2 Hash
